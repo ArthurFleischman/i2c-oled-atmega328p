@@ -1,0 +1,51 @@
+CC=avr-gcc
+CFLAGS= -Os -DF_CPU=16000000UL\
+		-mmcu=atmega328p\
+		-Werror\
+		-I $(U8G2)/lib/ \
+		-I $(U8G2)/src/ \
+		-I $(U8G2)/lib/avr-hw-i2c\
+		-Werror \
+		-ffunction-sections \
+		-fdata-sections \
+		-D AVR_USE_HW_I2C 
+
+LDFLAGS = -Wl,--gc-sections
+OBJCPY = avr-objcopy
+SIZE = avr-size
+MCU=m328p
+PROG=usbasp
+EFUSE= -U efuse:w:0xFA:m
+LFUSE= -U lfuse:w:0x62:m
+HFUSE= -U hfuse:w:0xD9:m
+
+#libs
+U8G2=./include/u8g2
+U8G2_COMP=$(U8G2)/build
+
+#code compile
+SRC = $(shell ls $(U8G2)/src/*.c)\
+	  $(shell ls $(U8G2)/lib/*.c)\
+	  $(shell ls $(U8G2)/lib/avr-hw-i2c/*.c)\
+	  $(shell ls ./*.c)
+
+OBJ = $(SRC:.c=.o)
+
+
+main.hex: main.elf
+	$(OBJCPY) -O ihex -R .eeprom -R .fuse -R .lock -R .signature main.elf main.hex
+
+main.elf: $(OBJ)	
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ) -o $@ 
+
+size: main.elf
+	$(SIZE) --mcu=$(MCU) --format=avr main.elf
+
+upload: main.hex
+	avrdude -V -c $(PROG) -p $(MCU) -b 115200 -U flash:w:$< 
+
+clean:
+	rm -f *.hex *.out
+	rm -f include/u8g2/src/*.o
+	rm -f include/u8g2/lib/*.o
+	rm -f *.o *.elf *.hex
